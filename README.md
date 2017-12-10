@@ -51,3 +51,35 @@ Create the template file `templates/hello.php`:
 ```php
 <p>Hello <?= $name ?>!</p>
 ```
+
+## Access to request data
+
+Use `getParam` method to access to `GET` and `POST` parameter:
+```php
+$app->get('/', function() {
+    $foo = $this->getParam('foo');
+});
+```
+
+Use `getFile` method to access to `FILES`. Result is an [`UploadedFile`](http://api.symfony.com/master/Symfony/Component/HttpFoundation/File/UploadedFile.html):
+```php
+$app->get('/', function() {
+    $file = $this->getFile('bar');
+});
+```
+
+## Advanced response
+
+Redirect to another URL:
+```php
+$app->get('/', function() {
+    $this->redirect('/login');
+});
+```
+
+Serve a static file:
+```php
+$app->get('/download/', function() {
+    $this->sendFile('/path/to/some-file.txt', 'pretty-name.txt');
+});
+```
