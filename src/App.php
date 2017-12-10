@@ -4,18 +4,27 @@ namespace Phencil;
 
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
 class App
 {
     private $_options;
+    private $_request;
     private $_routes;
 
     public function __construct($options = [])
     {
         $this->_options = $options;
         $this->_routes  = [];
+
+        //---------------------------------------------------------------------------
+        // Init request
+
+        $this->_request = Request::createFromGlobals();
     }
 
     public function __call($method, $args)
@@ -40,11 +49,6 @@ class App
     public function run()
     {
         //---------------------------------------------------------------------------
-        // Init request
-
-        $request = Request::createFromGlobals();
-
-        //---------------------------------------------------------------------------
         // Init router
 
         $routes = $this->_routes;
@@ -59,13 +63,13 @@ class App
         //---------------------------------------------------------------------------
         // Dispatch
 
-        $routeInfo = $dispatcher->dispatch($request->getMethod(), $request->getPathInfo());
+        $routeInfo = $dispatcher->dispatch($this->_request->getMethod(), $this->_request->getPathInfo());
         switch ($routeInfo[0]) {
             case Dispatcher::FOUND:
-                $view = new View($this->_options);
-                $handler = $routeInfo[1];
+                $handler = new Handler($this);
+                $callback = $routeInfo[1];
                 $vars = $routeInfo[2];
-                $content = call_user_func_array($handler->bindTo($view), $vars);
+                $content = call_user_func_array($callback->bindTo($handler), $vars);
                 $statusCode = Response::HTTP_OK;
                 break;
             case Dispatcher::NOT_FOUND:
@@ -82,6 +86,51 @@ class App
         // Send response
 
         $response = new Response($content, $statusCode);
-        $response->prepare($request)->send();
+        $this->_sendResponse($response);
     }
+
+    public function redirect($url)
+    {
+        $response = new RedirectResponse($url);
+        $this->_sendResponse($response);
+    }
+
+    public function sendFile($file, $filename = null)
+    {
+        $response = new BinaryFileResponse($file);
+        if ($filename) {
+            $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $filename);
+        }
+        $this->_sendResponse($response);
+    }
+
+    private function _sendResponse($response)
+    {
+        $response->prepare($this->_request)->send();
+        exit;
+    }
+
+    public function getParam($name)
+    {
+        $value = null;
+        if ($this->_request->query->has($name)) {
+            $value = $this->_request->query->get($name); // $_GET
+        } else if ($this->_request->request->has($name)) {
+            $value = $this->request->request->get($name); // $_POST
+        }
+        return $value;
+    }
+
+    public function getFile($name)
+    {
+        return $this->_request->files->get($name); // $_FILES
+    }
+
+    public function getOption($name)
+    {
+        if (isset($this->_options[$name])) {
+            return $this->_options[$name];
+        }
+    }
+
 }
