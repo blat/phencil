@@ -116,7 +116,7 @@ class App
         if ($this->_request->query->has($name)) {
             $value = $this->_request->query->get($name); // $_GET
         } else if ($this->_request->request->has($name)) {
-            $value = $this->request->request->get($name); // $_POST
+            $value = $this->_request->request->get($name); // $_POST
         }
         return $value;
     }
