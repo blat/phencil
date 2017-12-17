@@ -12,14 +12,27 @@ use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
 class App
 {
-    private $_options;
+    private static $_options;
     private $_request;
     private $_routes;
 
     public function __construct($options = [])
     {
-        $this->_options = $options;
+        self::$_options = $options;
         $this->_routes  = [];
+
+        if (!empty($options['sessions'])) session_start();
+
+        if (!empty($options['database'])) {
+
+            //---------------------------------------------------------------------------
+            // Init ORM
+
+            $capsule = new \Illuminate\Database\Capsule\Manager;
+            $capsule->addConnection($options['database']);
+            $capsule->setAsGlobal();
+            $capsule->bootEloquent();
+        }
 
         //---------------------------------------------------------------------------
         // Init request
@@ -70,28 +83,31 @@ class App
                 $callback = $routeInfo[1];
                 $vars = $routeInfo[2];
                 $content = call_user_func_array($callback->bindTo($handler), $vars);
-                $statusCode = Response::HTTP_OK;
                 break;
             case Dispatcher::NOT_FOUND:
-                $content = "404 Not Found";
-                $statusCode = Response::HTTP_NOT_FOUND;
+                $this->error(Response::HTTP_NOT_FOUND, "404 Not Found");
                 break;
             case Dispatcher::METHOD_NOT_ALLOWED:
-                $content = "405 Method Not Allowed";
-                $statusCode = Response::HTTP_METHOD_NOT_ALLOWED;
+                $this->error(Response::HTTP_METHOD_NOT_ALLOWED, "405 Method Not Allowed");
                 break;
         }
 
         //---------------------------------------------------------------------------
         // Send response
 
-        $response = new Response($content, $statusCode);
+        $response = new Response($content, Response::HTTP_OK);
         $this->_sendResponse($response);
     }
 
     public function redirect($url)
     {
         $response = new RedirectResponse($url);
+        $this->_sendResponse($response);
+    }
+
+    public function error($code, $message = '')
+    {
+        $response = new Response($message, $code);
         $this->_sendResponse($response);
     }
 
@@ -126,10 +142,10 @@ class App
         return $this->_request->files->get($name); // $_FILES
     }
 
-    public function getOption($name)
+    public static function getOption($name)
     {
-        if (isset($this->_options[$name])) {
-            return $this->_options[$name];
+        if (isset(self::$_options[$name])) {
+            return self::$_options[$name];
         }
     }
 
